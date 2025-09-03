@@ -1,0 +1,6 @@
+node_modules_bak
+**/node_modules_bak/**
+.git_backup
+dev.log
+cookies*.txt
+test-*.js

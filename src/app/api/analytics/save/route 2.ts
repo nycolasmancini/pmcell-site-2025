@@ -73,10 +73,6 @@ function checkRateLimit(sessionId: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    // Adicionar tratamento para content-type
-    const contentType = request.headers.get('content-type')
-    console.log('📊 Analytics Save: Content-Type:', contentType)
-    
     const data: AnalyticsPayload = await request.json()
     
     if (!data.sessionId) {
@@ -96,9 +92,8 @@ export async function POST(request: NextRequest) {
 
     console.log('📊 Analytics Save: Recebendo dados para sessionId:', data.sessionId)
 
-    try {
-      // Tentar usar Prisma primeiro
-      const session = await prisma.analyticsSession.upsert({
+    // Upsert da sessão principal
+    const session = await prisma.analyticsSession.upsert({
       where: { sessionId: data.sessionId },
       update: {
         whatsapp: data.whatsapp || undefined,
@@ -258,57 +253,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-  } catch (dbError) {
-      console.warn('⚠️ Analytics Save: Banco indisponível, usando fallback em memória', dbError.message)
-      
-      // Fallback: salvar em arquivo local
-      const fs = require('fs')
-      const path = require('path')
-      
-      const analyticsFile = path.join(process.cwd(), 'data', 'analytics.json')
-      const dataDir = path.dirname(analyticsFile)
-      
-      // Garantir que pasta existe
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true })
-      }
-      
-      // Carregar dados existentes
-      let analyticsData = []
-      try {
-        if (fs.existsSync(analyticsFile)) {
-          analyticsData = JSON.parse(fs.readFileSync(analyticsFile, 'utf8'))
-        }
-      } catch (e) {
-        analyticsData = []
-      }
-      
-      // Adicionar novos dados
-      analyticsData.push({
-        sessionId: data.sessionId,
-        whatsapp: data.whatsapp,
-        timestamp: new Date().toISOString(),
-        data
-      })
-      
-      // Manter apenas últimos 1000 registros
-      if (analyticsData.length > 1000) {
-        analyticsData = analyticsData.slice(-1000)
-      }
-      
-      // Salvar de volta
-      fs.writeFileSync(analyticsFile, JSON.stringify(analyticsData, null, 2))
-      
-      console.log('✅ Analytics Save: Dados salvos em fallback (arquivo) para sessionId:', data.sessionId)
-      
-      return NextResponse.json({
-        success: true,
-        message: 'Dados de analytics salvos com sucesso (fallback)',
-        sessionId: data.sessionId,
-        fallback: true
-      })
-    }
-
     console.log('✅ Analytics Save: Dados salvos com sucesso para sessionId:', data.sessionId)
 
     return NextResponse.json({
@@ -330,20 +274,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
-  return NextResponse.json({
-    status: 'ok',
-    message: 'Analytics API is running',
-    timestamp: new Date().toISOString()
-  }, { status: 200 })
-}
-
 export async function OPTIONS() {
   return NextResponse.json({}, {
     status: 200,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   })
